@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInfo = document.getElementById('fileInfo');
     const fileName = document.getElementById('fileName');
     const convertButton = document.getElementById('convertButton');
+    const previewSection = document.getElementById('previewSection');
+    const previewBody = document.getElementById('previewBody');
+    const totalAmount = document.getElementById('totalAmount');
 
     // Drag and drop handlers
     dropZone.addEventListener('dragover', (e) => {
@@ -32,9 +35,57 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file && file.type === 'text/xml') {
             fileName.textContent = file.name;
             fileInfo.classList.remove('hidden');
-            convertButton.disabled = false;
+            convertButton.disabled = true; // Disable until preview is shown
+            
+            const reader = new FileReader();
+            reader.onload = (e) => generatePreview(e.target.result);
+            reader.readAsText(file);
         } else {
-            alert('Please upload a valid XML file');
+            alert('Please upload a valid SEPA XML file');
+        }
+    }
+
+    function generatePreview(xmlContent) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+
+        // Verify it's a SEPA Credit Transfer file
+        const xmlns = xmlDoc.documentElement.getAttribute('xmlns');
+        if (!xmlns || !xmlns.includes('pain.001.001.03')) {
+            alert('Invalid file format. Please upload a SEPA Credit Transfer (pain.001.001.03) file.');
+            return;
+        }
+
+        try {
+            const transactions = xmlDoc.getElementsByTagName('CdtTrfTxInf');
+            let total = 0;
+            
+            // Clear existing preview
+            previewBody.innerHTML = '';
+            
+            // Process each transaction for preview
+            Array.from(transactions).forEach(tx => {
+                const amount = parseFloat(tx.querySelector('Amt > InstdAmt').textContent);
+                total += amount;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${tx.querySelector('Cdtr > Nm').textContent}</td>
+                    <td>${tx.querySelector('CdtrAcct > Id > IBAN').textContent}</td>
+                    <td>${amount.toFixed(2)} ${tx.querySelector('Amt > InstdAmt').getAttribute('Ccy')}</td>
+                    <td>${tx.querySelector('RmtInf > Ustrd')?.textContent || ''}</td>
+                `;
+                previewBody.appendChild(row);
+            });
+
+            // Update total and show preview
+            totalAmount.textContent = `${total.toFixed(2)} EUR`;
+            previewSection.classList.remove('hidden');
+            convertButton.disabled = false;
+
+        } catch (error) {
+            console.error('Error processing file:', error);
+            alert('Error processing the SEPA file. Please ensure it\'s a valid SEPA Credit Transfer file.');
         }
     }
 
@@ -45,35 +96,73 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
-            
-            // This is a basic conversion - you'll need to customize this
-            // based on your XML structure
-            const rows = [];
-            const elements = xmlDoc.getElementsByTagName('*');
-            
-            // Get all unique tag names for headers
-            const headers = new Set();
-            for (const element of elements) {
-                headers.add(element.tagName);
-            }
-            
-            // Convert to CSV
-            const csvContent = [Array.from(headers).join(',')].concat(
-                Array.from(elements).map(el => 
-                    Array.from(headers).map(header => 
-                        el.tagName === header ? el.textContent : ''
-                    ).join(',')
-                )
-            ).join('\n');
 
-            // Create and trigger download
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('href', url);
-            a.setAttribute('download', 'converted.csv');
-            a.click();
-            window.URL.revokeObjectURL(url);
+            // Verify it's a SEPA Credit Transfer file
+            const xmlns = xmlDoc.documentElement.getAttribute('xmlns');
+            if (!xmlns || !xmlns.includes('pain.001.001.03')) {
+                alert('Invalid file format. Please upload a SEPA Credit Transfer (pain.001.001.03) file.');
+                return;
+            }
+
+            try {
+                // Get all credit transfer transactions
+                const transactions = xmlDoc.getElementsByTagName('CdtTrfTxInf');
+                
+                // Prepare CSV content
+                const csvRows = [];
+                
+                // Add header
+                csvRows.push([
+                    'Name',
+                    'Recipient type',
+                    'IBAN',
+                    'BIC',
+                    'Recipient bank country',
+                    'Currency',
+                    'Amount',
+                    'Payment reference',
+                ].join(','));
+
+                // Process each transaction
+                Array.from(transactions).forEach(tx => {
+                    const row = {
+                        name: tx.querySelector('Cdtr > Nm').textContent,
+                        recipientType: 'Company', // Default to Company for SEPA batch payments
+                        iban: tx.querySelector('CdtrAcct > Id > IBAN').textContent,
+                        bic: '', // BIC is optional in SEPA
+                        recipientBankCountry: tx.querySelector('Cdtr > PstlAdr > Ctry').textContent,
+                        currency: tx.querySelector('Amt > InstdAmt').getAttribute('Ccy'),
+                        amount: tx.querySelector('Amt > InstdAmt').textContent,
+                        reference: tx.querySelector('RmtInf > Ustrd')?.textContent || '',
+                    };
+
+                    csvRows.push([
+                        row.name,
+                        row.recipientType,
+                        row.iban,
+                        row.bic,
+                        row.recipientBankCountry,
+                        row.currency,
+                        row.amount,
+                        row.reference,
+                    ].join(','));
+                });
+
+                // Create and trigger download
+                const csvContent = csvRows.join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const originalFileName = file.name.replace(/\.[^/.]+$/, '');
+                a.setAttribute('href', url);
+                a.setAttribute('download', `${originalFileName}-revolut.csv`);
+                a.click();
+                window.URL.revokeObjectURL(url);
+
+            } catch (error) {
+                console.error('Error processing file:', error);
+                alert('Error processing the SEPA file. Please ensure it\'s a valid SEPA Credit Transfer file.');
+            }
         };
 
         reader.readAsText(file);

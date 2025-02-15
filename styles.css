@@ -95,4 +95,16 @@ h1 {
 
 .hidden {
     display: none;
+}
+
+.table-responsive {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.table th {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 1;
 } 
