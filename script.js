@@ -44,6 +44,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return '';
     }
 
+    function getBICFromTransaction(tx) {
+        // First try to get BIC from the XML
+        const bicElement = tx.querySelector('CdtrAgt > FinInstnId > BIC');
+        if (bicElement && bicElement.textContent) {
+            return bicElement.textContent;
+        }
+
+        // If not found in XML, try to derive it from IBAN
+        const iban = tx.querySelector('CdtrAcct > Id > IBAN').textContent;
+        return getBICFromIBAN(iban);
+    }
+
     // Drag and drop handlers
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -104,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Array.from(transactions).forEach(tx => {
                 const amount = parseFloat(tx.querySelector('Amt > InstdAmt').textContent);
                 const iban = tx.querySelector('CdtrAcct > Id > IBAN').textContent;
-                const bic = getBICFromIBAN(iban);
+                const bic = getBICFromTransaction(tx);
                 total += amount;
 
                 const row = document.createElement('tr');
@@ -186,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Process each transaction
                 Array.from(transactions).forEach(tx => {
                     const iban = tx.querySelector('CdtrAcct > Id > IBAN').textContent;
-                    const bic = getBICFromIBAN(iban);
+                    const bic = getBICFromTransaction(tx);
                     if (!bic) hasWarnings = true;
 
                     const row = {
