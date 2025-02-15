@@ -105,10 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Get all credit transfer transactions
                 const transactions = xmlDoc.getElementsByTagName('CdtTrfTxInf');
-                
-                // Prepare CSV content
                 const csvRows = [];
                 
                 // Add header
@@ -123,11 +120,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Payment reference',
                 ].join(','));
 
+                // Helper function to escape CSV fields
+                const escapeField = (field) => {
+                    if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                        // Escape double quotes with double quotes and wrap in quotes
+                        return `"${field.replace(/"/g, '""')}"`;
+                    }
+                    return field;
+                };
+
                 // Process each transaction
                 Array.from(transactions).forEach(tx => {
                     const row = {
                         name: tx.querySelector('Cdtr > Nm').textContent,
-                        recipientType: 'Company', // Default to Company for SEPA batch payments
+                        recipientType: 'INDIVIDUAL', // Default to 'INDIVIDUAL'. Can also be 'COMPANY'
                         iban: tx.querySelector('CdtrAcct > Id > IBAN').textContent,
                         bic: '', // BIC is optional in SEPA
                         recipientBankCountry: tx.querySelector('Cdtr > PstlAdr > Ctry').textContent,
@@ -137,14 +143,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
 
                     csvRows.push([
-                        row.name,
+                        escapeField(row.name),
                         row.recipientType,
                         row.iban,
                         row.bic,
                         row.recipientBankCountry,
                         row.currency,
                         row.amount,
-                        row.reference,
+                        escapeField(row.reference),
                     ].join(','));
                 });
 
