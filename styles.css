@@ -31,18 +31,17 @@ h1 {
 }
 
 .upload-container {
-    background: white;
-    border: 2px dashed #ccc;
-    border-radius: 8px;
+    border: 2px dashed #dee2e6;
     padding: 2rem;
     text-align: center;
     transition: border-color 0.3s ease;
     cursor: pointer;
+    background: #f8f9fa;
 }
 
 .upload-container.drag-over {
-    border-color: var(--primary-color);
-    background: #f8f9fa;
+    border-color: #0d6efd;
+    background: #fff;
 }
 
 .upload-icon {

@@ -4,22 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XML to CSV Converter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>XML to CSV Converter</h1>
-        <div class="upload-container" id="dropZone">
-            <img src="upload-icon.svg" alt="Upload" class="upload-icon">
-            <p>Drag & drop your XML file here<br>or</p>
-            <input type="file" id="fileInput" accept=".xml" class="file-input">
-            <label for="fileInput" class="upload-button">Choose File</label>
-        </div>
-        <div id="fileInfo" class="file-info hidden">
-            <p>Selected file: <span id="fileName">No file selected</span></p>
-            <button id="convertButton" class="convert-button" disabled>Convert to CSV</button>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h1 class="text-center mb-4">XML to CSV Converter</h1>
+                        <div class="upload-container rounded" id="dropZone">
+                            <img src="upload-icon.svg" alt="Upload" class="upload-icon">
+                            <p class="text-muted">Drag & drop your XML file here<br>or</p>
+                            <input type="file" id="fileInput" accept=".xml" class="file-input">
+                            <label for="fileInput" class="btn btn-primary">Choose File</label>
+                        </div>
+                        <div id="fileInfo" class="mt-4 text-center hidden">
+                            <div class="alert alert-info">
+                                Selected file: <span id="fileName" class="fw-bold">No file selected</span>
+                            </div>
+                            <button id="convertButton" class="btn btn-success" disabled>
+                                <i class="bi bi-download me-2"></i>Convert to CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js"></script>
 </body>
-</html> 
+</html>
