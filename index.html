@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML to CSV Converter</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>XML to CSV Converter</h1>
+        <div class="upload-container" id="dropZone">
+            <img src="upload-icon.svg" alt="Upload" class="upload-icon">
+            <p>Drag & drop your XML file here<br>or</p>
+            <input type="file" id="fileInput" accept=".xml" class="file-input">
+            <label for="fileInput" class="upload-button">Choose File</label>
+        </div>
+        <div id="fileInfo" class="file-info hidden">
+            <p>Selected file: <span id="fileName">No file selected</span></p>
+            <button id="convertButton" class="convert-button" disabled>Convert to CSV</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 
