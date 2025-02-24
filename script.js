@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return getBICFromIBAN(iban);
     }
 
+    let currentXmlContent = null; // Add this to store the XML content
+
     // Drag and drop handlers
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -83,10 +85,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file && file.type === 'text/xml') {
             fileName.textContent = file.name;
             fileInfo.classList.remove('hidden');
-            convertButton.disabled = true; // Disable until preview is shown
+            convertButton.disabled = true;
             
             const reader = new FileReader();
-            reader.onload = (e) => generatePreview(e.target.result);
+            reader.onload = (e) => {
+                currentXmlContent = e.target.result; // Store the XML content
+                generatePreview(currentXmlContent);
+            };
             reader.readAsText(file);
         } else {
             alert('Please upload a valid SEPA XML file');
@@ -155,96 +160,94 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function convertToCSV() {
-        const file = fileInput.files[0];
-        const reader = new FileReader();
+        if (!currentXmlContent) {
+            alert('Please upload a file first');
+            return;
+        }
 
-        reader.onload = (e) => {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(currentXmlContent, 'text/xml');
 
-            // Verify it's a SEPA Credit Transfer file
-            const xmlns = xmlDoc.documentElement.getAttribute('xmlns');
-            if (!xmlns || !xmlns.includes('pain.001.001.03')) {
-                alert('Invalid file format. Please upload a SEPA Credit Transfer (pain.001.001.03) file.');
+        // Verify it's a SEPA Credit Transfer file
+        const xmlns = xmlDoc.documentElement.getAttribute('xmlns');
+        if (!xmlns || !xmlns.includes('pain.001.001.03')) {
+            alert('Invalid file format. Please upload a SEPA Credit Transfer (pain.001.001.03) file.');
+            return;
+        }
+
+        try {
+            const transactions = xmlDoc.getElementsByTagName('CdtTrfTxInf');
+            const csvRows = [];
+            let hasWarnings = false;
+            
+            // Add header
+            csvRows.push([
+                'Name',
+                'Recipient type',
+                'IBAN',
+                'BIC',
+                'Recipient bank country',
+                'Currency',
+                'Amount',
+                'Payment reference',
+            ].join(','));
+
+            // Helper function to escape CSV fields
+            const escapeField = (field) => {
+                if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+                    // Escape double quotes with double quotes and wrap in quotes
+                    return `"${field.replace(/"/g, '""')}"`;
+                }
+                return field;
+            };
+
+            // Process each transaction
+            Array.from(transactions).forEach(tx => {
+                const iban = tx.querySelector('CdtrAcct > Id > IBAN').textContent;
+                const bic = getBICFromTransaction(tx);
+                if (!bic) hasWarnings = true;
+
+                const row = {
+                    name: tx.querySelector('Cdtr > Nm').textContent,
+                    recipientType: 'INDIVIDUAL',
+                    iban: iban,
+                    bic: bic,
+                    recipientBankCountry: tx.querySelector('Cdtr > PstlAdr > Ctry').textContent,
+                    currency: tx.querySelector('Amt > InstdAmt').getAttribute('Ccy'),
+                    amount: tx.querySelector('Amt > InstdAmt').textContent,
+                    reference: tx.querySelector('RmtInf > Ustrd')?.textContent || '',
+                };
+
+                csvRows.push([
+                    escapeField(row.name),
+                    row.recipientType,
+                    row.iban,
+                    row.bic,
+                    row.recipientBankCountry,
+                    row.currency,
+                    row.amount,
+                    escapeField(row.reference),
+                ].join(','));
+            });
+
+            if (hasWarnings && !confirm('Some bank codes could not be identified. The CSV file might not be accepted by Revolut. Do you want to continue?')) {
                 return;
             }
 
-            try {
-                const transactions = xmlDoc.getElementsByTagName('CdtTrfTxInf');
-                const csvRows = [];
-                let hasWarnings = false;
-                
-                // Add header
-                csvRows.push([
-                    'Name',
-                    'Recipient type',
-                    'IBAN',
-                    'BIC',
-                    'Recipient bank country',
-                    'Currency',
-                    'Amount',
-                    'Payment reference',
-                ].join(','));
+            // Create and trigger download
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const originalFileName = fileName.textContent.replace(/\.[^/.]+$/, '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `${originalFileName}-revolut.csv`);
+            a.click();
+            window.URL.revokeObjectURL(url);
 
-                // Helper function to escape CSV fields
-                const escapeField = (field) => {
-                    if (field.includes(',') || field.includes('"') || field.includes('\n')) {
-                        // Escape double quotes with double quotes and wrap in quotes
-                        return `"${field.replace(/"/g, '""')}"`;
-                    }
-                    return field;
-                };
-
-                // Process each transaction
-                Array.from(transactions).forEach(tx => {
-                    const iban = tx.querySelector('CdtrAcct > Id > IBAN').textContent;
-                    const bic = getBICFromTransaction(tx);
-                    if (!bic) hasWarnings = true;
-
-                    const row = {
-                        name: tx.querySelector('Cdtr > Nm').textContent,
-                        recipientType: 'INDIVIDUAL',
-                        iban: iban,
-                        bic: bic,
-                        recipientBankCountry: tx.querySelector('Cdtr > PstlAdr > Ctry').textContent,
-                        currency: tx.querySelector('Amt > InstdAmt').getAttribute('Ccy'),
-                        amount: tx.querySelector('Amt > InstdAmt').textContent,
-                        reference: tx.querySelector('RmtInf > Ustrd')?.textContent || '',
-                    };
-
-                    csvRows.push([
-                        escapeField(row.name),
-                        row.recipientType,
-                        row.iban,
-                        row.bic,
-                        row.recipientBankCountry,
-                        row.currency,
-                        row.amount,
-                        escapeField(row.reference),
-                    ].join(','));
-                });
-
-                if (hasWarnings && !confirm('Some bank codes could not be identified. The CSV file might not be accepted by Revolut. Do you want to continue?')) {
-                    return;
-                }
-
-                // Create and trigger download
-                const csvContent = csvRows.join('\n');
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const originalFileName = file.name.replace(/\.[^/.]+$/, '');
-                a.setAttribute('href', url);
-                a.setAttribute('download', `${originalFileName}-revolut.csv`);
-                a.click();
-                window.URL.revokeObjectURL(url);
-
-            } catch (error) {
-                console.error('Error processing file:', error);
-                alert('Error processing the SEPA file. Please ensure it\'s a valid SEPA Credit Transfer file.');
-            }
-        };
-
-        reader.readAsText(file);
+        } catch (error) {
+            console.error('Error processing file:', error);
+            alert('Error processing the SEPA file. Please ensure it\'s a valid SEPA Credit Transfer file.');
+        }
     }
 }); 
